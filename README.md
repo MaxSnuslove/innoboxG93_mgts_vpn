@@ -173,43 +173,98 @@ WAN-интерфейс `nas0_0` получает IP из `100.110.0.0/16` — э
 
 ## Архитектура
 
+### Общая схема потока трафика
+
+```mermaid
+flowchart TD
+    Client["💻 LAN-клиент<br/>192.168.1.x"]
+
+    subgraph Router["📡 Innbox G93"]
+        direction TB
+        Bridge["br-lan"]
+
+        subgraph RT["⚙️ kernel: ip rule + маршрутизация"]
+            direction TB
+            R9001["rule 9001: from all lookup 2022<br/>suppress_prefixlength 0<br/>⤵ всё кроме RFC1918/CGNAT → tun0"]
+            R1808["rule 1808: fwmark 0x710 lookup main<br/>⤵ сокеты sing-box идут напрямую на WAN<br/>(чтобы не зациклиться в собственный TUN)"]
+        end
+
+        TUN["🔌 tun0 · 172.19.0.1/30<br/>MTU 1400"]
+
+        subgraph SB["🧬 sing-box · stack: gvisor"]
+            direction TB
+            INB["TUN inbound<br/>читает сырые IP-пакеты"]
+            ROUTE{"route rules<br/>sniff → action"}
+            HJ["hijack-dns<br/>DoH 1.1.1.1 через proxy"]
+            DIR["direct outbound"]
+            VLESS["VLESS+Reality outbound<br/>selector: USA / NL / UK"]
+        end
+
+        WAN["🌍 nas0_0 (WAN)<br/>CGNAT 100.110.x.x"]
+    end
+
+    SRV(["🔐 VLESS-сервер"])
+    NET(["🌐 Целевой сайт"])
+
+    Client -->|TCP/UDP| Bridge
+    Bridge --> R9001
+    R9001 --> TUN
+    TUN --> INB
+    INB --> ROUTE
+    ROUTE -->|"port 53 / protocol: dns"| HJ
+    ROUTE -->|"ip_is_private"| DIR
+    ROUTE -->|"всё остальное (final)"| VLESS
+    HJ -.->|"DoH-запрос идёт через proxy"| VLESS
+    DIR --> R1808
+    VLESS --> R1808
+    R1808 --> WAN
+    WAN --> SRV
+    SRV --> NET
+
+    style TUN fill:#e3f2fd,stroke:#1565c0,color:#000
+    style SB fill:#fff8e1,stroke:#f57c00,color:#000
+    style VLESS fill:#c8e6c9,stroke:#2e7d32,color:#000
+    style HJ fill:#f3e5f5,stroke:#7b1fa2,color:#000
+    style R1808 fill:#ffebee,stroke:#c62828,color:#000
+    style R9001 fill:#ffebee,stroke:#c62828,color:#000
+    style Client fill:#eceff1,stroke:#37474f,color:#000
+    style WAN fill:#fff3e0,stroke:#ef6c00,color:#000
 ```
-                                    ┌───────────────────────┐
-[LAN клиент 192.168.1.x]             │ 1. br-lan (PREROUTING,│
- TCP/UDP к любому адресу  ──────────▶│    FORWARD chains)    │
-                                    │ 2. маршрутизация      │
-                                    │    (таблица 2022 —    │
-                                    │    всё кроме RFC1918  │
-                                    │    и CGNAT → tun0)    │
-                                    └──────────┬────────────┘
-                                               │
-                                               ▼
-                                      /dev/net/tun (tun0)
-                                               │
-                                               ▼
-                                    ┌──────────────────────┐
-                                    │    sing-box          │
-                                    │    stack: gvisor     │
-                                    │    TUN inbound       │
-                                    │           │          │
-                                    │    sniff, route,     │
-                                    │    hijack DNS        │
-                                    │           │          │
-                                    │           ▼          │
-                                    │    VLESS outbound    │
-                                    │    (fwmark 0x710     │
-                                    │    → обход TUN для   │
-                                    │    sing-box-сокетов) │
-                                    └──────────┬───────────┘
-                                               │
-                                               ▼
-                                           nas0_0 (WAN)
-                                               │
-                                               ▼
-                                    VLESS сервер (USA/NL/UK)
-                                               │
-                                               ▼
-                                        целевой интернет
+
+### Как в реальности идёт TCP-соединение
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant C as LAN Client
+    participant K as Kernel Router
+    participant T as tun0
+    participant S as sing-box (gvisor)
+    participant V as VLESS server
+    participant D as Целевой сайт
+
+    Note over C,D: 1️⃣ DNS (UDP :53) — перехват и резолв через DoH
+    C->>K: UDP → 62.112.113.170:53 (провайдерский DNS)
+    K->>T: rule 9001 → table 2022 → via tun0
+    T->>S: sing-box читает сырой UDP-пакет
+    S->>S: sniff → protocol=dns → hijack
+    S->>V: TCP DoH к 1.1.1.1:443 (через VLESS, fwmark 0x710)
+    V-->>S: ответ от Cloudflare
+    S->>T: пишет UDP-reply назад в tun0
+    T->>K: доставка процессу
+    K-->>C: DNS-ответ с реальным IP
+
+    Note over C,D: 2️⃣ TCP — транспорт через VLESS
+    C->>K: TCP SYN → <целевой IP>:443
+    K->>T: rule 9001 → table 2022 → via tun0
+    T->>S: sing-box читает SYN
+    S->>S: gvisor делает TCP-handshake в user-space
+    S->>V: открывает TCP к VLESS-серверу (fwmark 0x710)
+    V->>D: VLESS ретранслирует к цели
+    D-->>V: ответ
+    V-->>S: пересылает обратно
+    S->>T: пишет пакеты в tun0
+    T-->>C: клиент получает данные
 ```
 
 ### Что настраивается автоматически при старте
