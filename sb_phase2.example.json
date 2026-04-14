@@ -1,0 +1,112 @@
+{
+  "log": {
+    "level": "debug",
+    "output": "/etc/luci-uploads/sb.log",
+    "timestamp": true
+  },
+  "dns": {
+    "servers": [
+      {"type": "udp",   "tag": "local",  "server": "223.5.5.5"},
+      {"type": "https", "tag": "remote", "server": "1.1.1.1", "detour": "proxy"}
+    ],
+    "strategy": "ipv4_only",
+    "final": "remote"
+  },
+  "inbounds": [
+    {
+      "type": "mixed",
+      "tag": "mixed-in",
+      "listen": "127.0.0.1",
+      "listen_port": 1080
+    },
+    {
+      "type": "tun",
+      "tag": "tun-in",
+      "address": ["172.19.0.1/30"],
+      "mtu": 1400,
+      "auto_route": true,
+      "strict_route": true,
+      "stack": "gvisor",
+      "route_exclude_address": [
+        "192.168.0.0/16",
+        "10.0.0.0/8",
+        "172.16.0.0/12",
+        "100.64.0.0/10"
+      ]
+    }
+  ],
+  "outbounds": [
+    {
+      "type": "vless",
+      "tag": "vless-usa",
+      "server": "REPLACE_WITH_USA_HOST",
+      "server_port": 443,
+      "uuid": "REPLACE_WITH_YOUR_UUID",
+      "flow": "xtls-rprx-vision",
+      "tls": {
+        "enabled": true,
+        "server_name": "REPLACE_WITH_USA_HOST",
+        "utls": {"enabled": true, "fingerprint": "chrome"},
+        "reality": {
+          "enabled": true,
+          "public_key": "REPLACE_WITH_USA_REALITY_PUBKEY",
+          "short_id": "REPLACE_WITH_USA_SHORT_ID"
+        }
+      }
+    },
+    {
+      "type": "vless",
+      "tag": "vless-nl",
+      "server": "REPLACE_WITH_NL_HOST",
+      "server_port": 37824,
+      "uuid": "REPLACE_WITH_YOUR_UUID",
+      "flow": "xtls-rprx-vision",
+      "tls": {
+        "enabled": true,
+        "server_name": "REPLACE_WITH_NL_HOST",
+        "utls": {"enabled": true, "fingerprint": "chrome"},
+        "reality": {
+          "enabled": true,
+          "public_key": "REPLACE_WITH_NL_REALITY_PUBKEY",
+          "short_id": "REPLACE_WITH_NL_SHORT_ID"
+        }
+      }
+    },
+    {
+      "type": "vless",
+      "tag": "vless-uk",
+      "server": "REPLACE_WITH_UK_HOST",
+      "server_port": 443,
+      "uuid": "REPLACE_WITH_YOUR_UUID",
+      "flow": "xtls-rprx-vision",
+      "tls": {
+        "enabled": true,
+        "server_name": "REPLACE_WITH_UK_HOST",
+        "utls": {"enabled": true, "fingerprint": "chrome"},
+        "reality": {
+          "enabled": true,
+          "public_key": "REPLACE_WITH_UK_REALITY_PUBKEY",
+          "short_id": "REPLACE_WITH_UK_SHORT_ID"
+        }
+      }
+    },
+    {
+      "type": "selector",
+      "tag": "proxy",
+      "outbounds": ["vless-usa", "vless-nl", "vless-uk"],
+      "default": "vless-usa"
+    },
+    {"type": "direct", "tag": "direct"}
+  ],
+  "route": {
+    "rules": [
+      {"action": "sniff"},
+      {"protocol": "dns", "action": "hijack-dns"},
+      {"port": [53], "action": "hijack-dns"},
+      {"ip_is_private": true, "action": "route", "outbound": "direct"}
+    ],
+    "auto_detect_interface": true,
+    "final": "proxy",
+    "default_domain_resolver": "local"
+  }
+}

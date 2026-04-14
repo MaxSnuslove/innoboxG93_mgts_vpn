@@ -1,0 +1,57 @@
+# --- Secrets (VLESS credentials, subscriptions) ---
+sb_phase1.json
+sb_phase2.json
+sb_test.json
+sb_test2.json
+sub_servers.json
+singbox_router.json
+secrets.json
+
+# --- Binaries (too large for git, downloaded at boot time on the router) ---
+*.bin
+*.exe
+*.tgz
+*.zip
+sing-box-*/
+zapret-*/
+zapret2/
+zapret2_launcher.bat
+
+# --- Runtime/session artifacts ---
+dump/
+*.log
+.tok
+rc_local_block.txt
+cron_line.txt
+
+# --- Local iteration history / dev helpers (not part of the published solution) ---
+build_rclocal.py
+check_status.py
+deploy_diag.py
+deploy_phase1.py
+deploy_phase1_v114.py
+deploy_phase2.py
+deploy_phase2_v2.py
+deploy_phase2_v3.py
+deploy_phase2_v4.py
+deploy_rclocal.py
+portscan.py
+router_bootstrap.sh
+router_dump.py
+upload_sb.py
+verify_sb.py
+sb_phase1.example.json
+sub_servers.example.json
+
+# --- Python bytecode ---
+__pycache__/
+*.pyc
+*.pyo
+
+# --- Editors / OS ---
+.vscode/
+.idea/
+.claude/
+.playwright-mcp/
+Thumbs.db
+.DS_Store
