@@ -6,8 +6,17 @@
   },
   "dns": {
     "servers": [
-      {"type": "udp",   "tag": "local",  "server": "223.5.5.5"},
-      {"type": "https", "tag": "remote", "server": "1.1.1.1", "detour": "proxy"}
+      {
+        "type": "udp",
+        "tag": "local",
+        "server": "223.5.5.5"
+      },
+      {
+        "type": "https",
+        "tag": "remote",
+        "server": "1.1.1.1",
+        "detour": "proxy"
+      }
     ],
     "strategy": "ipv4_only",
     "final": "remote"
@@ -22,7 +31,9 @@
     {
       "type": "tun",
       "tag": "tun-in",
-      "address": ["172.19.0.1/30"],
+      "address": [
+        "172.19.0.1/30"
+      ],
       "mtu": 1400,
       "auto_route": true,
       "strict_route": true,
@@ -46,7 +57,10 @@
       "tls": {
         "enabled": true,
         "server_name": "REPLACE_WITH_USA_HOST",
-        "utls": {"enabled": true, "fingerprint": "chrome"},
+        "utls": {
+          "enabled": true,
+          "fingerprint": "chrome"
+        },
         "reality": {
           "enabled": true,
           "public_key": "REPLACE_WITH_USA_REALITY_PUBKEY",
@@ -64,7 +78,10 @@
       "tls": {
         "enabled": true,
         "server_name": "REPLACE_WITH_NL_HOST",
-        "utls": {"enabled": true, "fingerprint": "chrome"},
+        "utls": {
+          "enabled": true,
+          "fingerprint": "chrome"
+        },
         "reality": {
           "enabled": true,
           "public_key": "REPLACE_WITH_NL_REALITY_PUBKEY",
@@ -82,7 +99,10 @@
       "tls": {
         "enabled": true,
         "server_name": "REPLACE_WITH_UK_HOST",
-        "utls": {"enabled": true, "fingerprint": "chrome"},
+        "utls": {
+          "enabled": true,
+          "fingerprint": "chrome"
+        },
         "reality": {
           "enabled": true,
           "public_key": "REPLACE_WITH_UK_REALITY_PUBKEY",
@@ -93,20 +113,67 @@
     {
       "type": "selector",
       "tag": "proxy",
-      "outbounds": ["vless-usa", "vless-nl", "vless-uk"],
+      "outbounds": [
+        "vless-usa",
+        "vless-nl",
+        "vless-uk"
+      ],
       "default": "vless-usa"
     },
-    {"type": "direct", "tag": "direct"}
+    {
+      "type": "direct",
+      "tag": "direct"
+    }
   ],
   "route": {
     "rules": [
-      {"action": "sniff"},
-      {"protocol": "dns", "action": "hijack-dns"},
-      {"port": [53], "action": "hijack-dns"},
-      {"ip_is_private": true, "action": "route", "outbound": "direct"}
+      {
+        "action": "sniff"
+      },
+      {
+        "protocol": "dns",
+        "action": "hijack-dns"
+      },
+      {
+        "port": [
+          53
+        ],
+        "action": "hijack-dns"
+      },
+      {
+        "ip_is_private": true,
+        "action": "route",
+        "outbound": "direct"
+      },
+      {
+        "rule_set": [
+          "geoip-ru",
+          "geosite-ru"
+        ],
+        "action": "route",
+        "outbound": "direct"
+      }
     ],
     "auto_detect_interface": true,
     "final": "proxy",
-    "default_domain_resolver": "local"
+    "default_domain_resolver": "local",
+    "rule_set": [
+      {
+        "type": "remote",
+        "tag": "geoip-ru",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/SagerNet/sing-geoip/rule-set/geoip-ru.srs",
+        "download_detour": "proxy",
+        "update_interval": "7d"
+      },
+      {
+        "type": "remote",
+        "tag": "geosite-ru",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geolocation-ru.srs",
+        "download_detour": "proxy",
+        "update_interval": "7d"
+      }
+    ]
   }
 }
